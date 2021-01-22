@@ -13,7 +13,7 @@ class LocalDataset():
         self.name = "Local DataImp"
 
 
-    def init_local_data_set(self,host="localhost",user="root",password="None",database = "tmp",port=3306,charset='utf8'):
+    def init_local_data_set(self,host="localhost",user="root",password="None",database = "stock_test",port=3306,charset='utf8'):
         if(self.db!=None):
             self.cursor.close()
             self.db.close()
