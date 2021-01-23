@@ -32,6 +32,9 @@ class MyLog():
     def __print(self,info):
         print(info)
 
+    def  print_line(self,info):
+        self.__print(info)
+
 
 
 if __name__=="__main__":
