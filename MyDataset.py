@@ -11,11 +11,12 @@ class MyDataset():
         self.log = MyLog.get_instance()
         self.ld =  LocalDataset()
         self.rd =  remote_dataset()
-        self.name = "My Imp"
+        self.name = "My Dataset"
 
     def init(self):
         self.ld.init_local_data_set(host = "cdb-mqzvz536.bj.tencentcdb.com" ,port =10146 , user="root" , database="stock_test")
         self.rd.init()
+        self.log.log("Log : Dataset is initiated",self.name)
 
     def get_stock_data_start_end(self,code , start_date=None,end_date=None):
         '''
@@ -26,6 +27,7 @@ class MyDataset():
             start_date = "2000-01-01"
         if(end_date==None):
             end_date = datetime.date.today().strftime("%Y-%m-%d")
+        self.log.log("Log : try to get code {} data from  {} to {}".format(code,start_date,end_date),self.name)
         data_table =  "{}_price".format(self.rd.get_normalize_code(code))
         self.update_stock_data_start_end(code ,start_date,end_date)
         return self.__get_local_stock_data_start_end(code,start_date,end_date)
@@ -48,6 +50,7 @@ class MyDataset():
             "open_interest" :"double(10,2)"
         })
     def __get_remote_stock_data_start_end(self,code,start_date,end_date):
+        self.log.log("Log : try to get remote code {} data from  {} to {}".format(code,start_date,end_date),self.name)
         return self.rd.get_stock_price(code,start_date,end_date)
 
     def __get_local_stock_data_start_end(self,code,start=None,end=None):
@@ -63,6 +66,7 @@ class MyDataset():
     def update_stock_data_start_end(self,code,start_date,end_date):
         data_table = "{}_price".format(code)
         if(not self.ld.has_table(data_table)):
+            self.log.log("Warning : not find table {}, create it ".format(data_table))
             self.create_stock_data_table(data_table)    
         start_time = time.strptime(start_date,"%Y-%m-%d")
         start = datetime.date(start_time.tm_year,start_time.tm_mon,start_time.tm_mday)
@@ -71,6 +75,7 @@ class MyDataset():
         if(len(data)>0):
             record_date_first =  data[0][0]
             record_date_last =  data[-1][0]
+            self.log.log("Log :  local dataset find data from {} to {}".format(record_date_first,record_date_last),self.name)
             if(start<record_date_first):
                 data =  self.__get_remote_stock_data_start_end(code,start.strftime("%Y-%m-%d"),record_date_first.strftime("%Y-%m-%d"))
                 data=data.fillna(-1)
@@ -86,6 +91,8 @@ class MyDataset():
                     data['date'] = data['date'].apply(lambda x:'{}'.format( x.strftime("%Y%m%d")))
                     self.ld.insert_multi_data(data_table,data.to_numpy(), data.columns.to_list())
         else:
+            self.log.log("Log : no local data find for code {}".format(code),self.name)
+                
             data =  self.__get_remote_stock_data_start_end(code,start.strftime("%Y-%m-%d"),end.strftime("%Y-%m-%d"))
             data=data.fillna(-1)
             if(len(data.index)>0):
