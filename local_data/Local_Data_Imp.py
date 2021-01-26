@@ -50,6 +50,7 @@ class LocalDataset():
             return None
         self.cursor.execute(command)
         self.Log.log("Log : execute command : {}".format(command),self.name)
+        self.db.commit()
         return self.cursor.fetchall()
 
     def create_table(self,table_name, prop_dict):
@@ -65,8 +66,9 @@ class LocalDataset():
         columns_str = ""
         if(columns!=None):
             columns_str = '( '+ ','.join(columns)+')'
-        value_str = ''.join(['(' , '),('.join([','.join(['{}'.format(j) for j in values[i] ]) for i in values] )  , ')'])
+        value_str = ''.join(['(' , '),('.join([','.join(['{}'.format(j) for j in i ]) for i in values] )  , ')'])
         sql = 'insert into {} {} values {}'.format(table_name , columns_str,value_str)
+        print(sql)
         return self.execute(sql)
 
     def select_data(self,table_name , columns= None ,order_by = None , where_limit = None):
@@ -82,7 +84,7 @@ class LocalDataset():
         if(where_limit != None):
             where_str = "Where {}".format(where_limit)
 
-        cmd = " ".join(['select' ,columns_str, "from {}".format(table_name),where_str,order_by])
+        cmd = " ".join(['select' ,columns_str, "from {}".format(table_name),where_str,order_str])
         return self.execute(cmd)
 
 
@@ -94,3 +96,5 @@ class LocalDataset():
 if __name__=="__main__":
     LD = LocalDataset()    
     LD.init_local_data_set(host = "cdb-mqzvz536.bj.tencentcdb.com" ,port =10146 , user="root" , database="stock_test")
+    dt = LD.execute('select * from 600435_price where date >= date(20201215)')
+    print(dt)
