@@ -3,8 +3,9 @@ from remote_data.Remote_Data_Imp import remote_dataset
 from local_data.Local_Data_Imp import LocalDataset
 
 import datetime
-import jqdatasdk as jqs
+
 import time
+import csv
 
 class MyDataset():
     def __init__(self):
@@ -12,10 +13,15 @@ class MyDataset():
         self.ld =  LocalDataset()
         self.rd =  remote_dataset()
         self.name = "My Dataset"
+        self.index_name_list = []
 
     def init(self):
         self.ld.init_local_data_set(host = "cdb-mqzvz536.bj.tencentcdb.com" ,port =10146 , user="root" , database="stock_test")
         self.rd.init()
+        with open(".//index_name.csv",'r') as f:
+            csvr= csv.reader(f)
+            for i in csvr:
+                self.index_name_list.append(i)
         self.log.log("Log : Dataset is initiated",self.name)
 
     def get_stock_data_start_end(self,code , start_date=None,end_date=None):
@@ -99,12 +105,35 @@ class MyDataset():
                 data.insert(0,'date',data.index)
                 data['date'] = data['date'].apply(lambda x:'{}'.format( x.strftime("%Y%m%d")))
                 self.ld.insert_multi_data(data_table,data.to_numpy(), data.columns.to_list())
-    
+
+
+    def get_multi_stock_data_start_end(self,code_list,start=None,end=None):
+        data_dict = {}
+        for code in code_list:
+            data =  self.get_stock_data_start_end(code,start,end)
+            data_dict[code] = data
+        return data_dict
+
+    def show_index(self,name=None):
+        for i in self.index_name_list:
+            if(name !=None and name not in i[1]):
+                continue
+            print(i)
+
+
+
+
+    def get_index_stocks(self,index):
+        pass
+
 
 
 
 if __name__=="__main__":
     k = MyDataset()
     k.init()
-    p = k.get_stock_data_start_end('600435','2020-12-01','2021-01-01')
-    print(p)
+    k.show_index()
+    print("==delim==")
+    k.show_index('成长指数')
+    #p = k.get_stock_data_start_end('600435','2020-12-01','2021-01-01')
+    #print(p)

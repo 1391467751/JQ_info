@@ -30,7 +30,6 @@ class remote_dataset():
         if(self.login):
             data =  jqs.get_all_securities(['stock'],date=start_date)
             self.log.log("Log : Get all stock list "+ "from date {}".format(start_date) if start_date!=None else "" , self.name )
-
         return data;
 
     def get_stock_index_weight(self,index_id,start_date=None):
@@ -109,9 +108,6 @@ class remote_dataset():
                          +"count {}".format(count) if count != None else "",
                          self.name)
         return data
-
-
-
 
 
 if __name__ =="__main__":
