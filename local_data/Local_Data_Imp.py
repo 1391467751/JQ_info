@@ -67,7 +67,7 @@ class LocalDataset():
         if(columns!=None):
             columns_str = '( '+ ','.join(columns)+')'
         value_str = ''.join(['(' , '),('.join([','.join(['{}'.format(j) for j in i ]) for i in values] )  , ')'])
-        sql = 'insert into {} {} values {}'.format(table_name , columns_str,value_str)
+        sql = 'insert ignore into {} {} values {}'.format(table_name , columns_str,value_str)
         print(sql)
         return self.execute(sql)
 

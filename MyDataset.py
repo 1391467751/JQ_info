@@ -14,11 +14,27 @@ class MyDataset():
         self.rd =  remote_dataset()
         self.name = "My Dataset"
         self.index_name_list = []
+        self.stock_price_prop={
+            "date" :"date primary key",
+            "open" :"double(10,2)",
+            "close" :"double(10,2)",
+            "low":"double(10,2)",
+            "high":"double(10,2)",
+            "volume" :"BIGINT",
+            "money"   :"double(13,2)",
+            "factor" :"double(10,2)",
+            "high_limit" :"double(10,2)",
+            "low_limit" :"double(10,2)",
+            "avg"      :"double(10,2)",
+            "pre_close":"double(10,2)",
+            "paused" : "tinyint",
+            "open_interest" :"double(10,2)",
+        }
 
     def init(self):
         self.ld.init_local_data_set(host = "cdb-mqzvz536.bj.tencentcdb.com" ,port =10146 , user="root" , database="stock_test")
         self.rd.init()
-        with open(".//index_name.csv",'r') as f:
+        with open(".//index_name.csv",'r',encoding='GBK') as f:
             csvr= csv.reader(f)
             for i in csvr:
                 self.index_name_list.append(i)
@@ -35,31 +51,22 @@ class MyDataset():
             end_date = datetime.date.today().strftime("%Y-%m-%d")
         self.log.log("Log : try to get code {} data from  {} to {}".format(code,start_date,end_date),self.name)
         data_table =  "{}_price".format(self.rd.get_normalize_code(code))
-        self.update_stock_data_start_end(code ,start_date,end_date)
-        return self.__get_local_stock_data_start_end(code,start_date,end_date)
+        self.update_stock_data_start_end(code ,start_date,end_date,"{}_price".format(code),
+            self.stock_price_prop,
+            self.__get_local_stock_price_data_start_end,
+            self.__get_remote_stock_price_data_start_end
+        )
+        data1= self.__get_local_stock_price_data_start_end(code,start_date,end_date)
+        return data1
         
-    def  create_stock_data_table(self,table):
-        self.ld.create_table(table,{
-            "date" :"date primary key",
-            "open" :"double(10,2)",
-            "close" :"double(10,2)",
-            "low":"double(10,2)",
-            "high":"double(10,2)",
-            "volume" :"BIGINT",
-            "money"   :"double(13,2)",
-            "factor" :"double(10,2)",
-            "high_limit" :"double(10,2)",
-            "low_limit" :"double(10,2)",
-            "avg"      :"double(10,2)",
-            "pre_close":"double(10,2)",
-            "paused" : "tinyint",
-            "open_interest" :"double(10,2)"
-        })
-    def __get_remote_stock_data_start_end(self,code,start_date,end_date):
+    def __create_stock_data_table(self,table,prop):
+        self.ld.create_table(table,prop)
+
+    def __get_remote_stock_price_data_start_end(self,code,start_date,end_date):
         self.log.log("Log : try to get remote code {} data from  {} to {}".format(code,start_date,end_date),self.name)
         return self.rd.get_stock_price(code,start_date,end_date)
 
-    def __get_local_stock_data_start_end(self,code,start=None,end=None):
+    def __get_local_stock_price_data_start_end(self,code,start=None,end=None):
         where_limit =[] 
         if(start):
             where_limit.append(' date >= date("{}")'.format(start))
@@ -69,28 +76,37 @@ class MyDataset():
         table =  "{}_price".format(code)
         return self.ld.select_data(table,order_by = "Date",where_limit = None if len(where)<4 else where)
 
-    def update_stock_data_start_end(self,code,start_date,end_date):
-        data_table = "{}_price".format(code)
+    def update_stock_data_start_end(self,code,start_date,end_date,data_table,create_prop,func_local,func_remote):
+        '''
+            template for get date list stock info
+            code : stock code
+            start_date end_date  : should be '%Y-%m-%d'
+            data_table : save data table name in local
+            create_prop: dict used for create table , index should always be same with name for remote columns
+            func_local  func_remote : get info function from local and remote 
+                                    param should be code start end
+
+        '''
         if(not self.ld.has_table(data_table)):
             self.log.log("Warning : not find table {}, create it ".format(data_table))
-            self.create_stock_data_table(data_table)    
+            self.__create_stock_data_table(data_table,create_prop)    
         start_time = time.strptime(start_date,"%Y-%m-%d")
         start = datetime.date(start_time.tm_year,start_time.tm_mon,start_time.tm_mday)
         end = datetime.date.today()+datetime.timedelta(days=1)
-        data =  self.__get_local_stock_data_start_end(code)
+        data =  func_local(code)
         if(len(data)>0):
             record_date_first =  data[0][0]
             record_date_last =  data[-1][0]
             self.log.log("Log :  local dataset find data from {} to {}".format(record_date_first,record_date_last),self.name)
             if(start<record_date_first):
-                data =  self.__get_remote_stock_data_start_end(code,start.strftime("%Y-%m-%d"),record_date_first.strftime("%Y-%m-%d"))
+                data =  func_remote(code,start.strftime("%Y-%m-%d"),record_date_first.strftime("%Y-%m-%d"))
                 data=data.fillna(-1)
                 if(len(data.index)>0):
                     data.insert(0,'date',data.index)
                     data['date'] = data['date'].apply(lambda x: '{}'.format(x.strftime("%Y%m%d")))
                     self.ld.insert_multi_data(data_table,data.to_numpy(), data.columns.to_list())
             if(end>record_date_last):
-                data =  self.__get_remote_stock_data_start_end(code,record_date_last.strftime("%Y-%m-%d"),end.strftime("%Y-%m-%d"))
+                data =  func_remote(code,record_date_last.strftime("%Y-%m-%d"),end.strftime("%Y-%m-%d"))
                 data=data.fillna(-1)
                 if(len(data.index)>0):
                     data.insert(0,'date',data.index)
@@ -98,8 +114,7 @@ class MyDataset():
                     self.ld.insert_multi_data(data_table,data.to_numpy(), data.columns.to_list())
         else:
             self.log.log("Log : no local data find for code {}".format(code),self.name)
-                
-            data =  self.__get_remote_stock_data_start_end(code,start.strftime("%Y-%m-%d"),end.strftime("%Y-%m-%d"))
+            data =  func_remote(code,start.strftime("%Y-%m-%d"),end.strftime("%Y-%m-%d"))
             data=data.fillna(-1)
             if(len(data.index)>0):
                 data.insert(0,'date',data.index)
@@ -114,26 +129,31 @@ class MyDataset():
             data_dict[code] = data
         return data_dict
 
+    #finish stock data part
+
+    #start index weight part
     def show_index(self,name=None):
         for i in self.index_name_list:
             if(name !=None and name not in i[1]):
                 continue
             print(i)
 
+    def get_index_stocks(self,indexi,date=None):
+        if(date==None):
+            date =  datetime.date.today().strftime('%Y-%m-01')
+        tablename  = '{}_index_weight_{}'.format(index,date).replace('.','')
+        if(not self.ld.has_table(tablename)):
+            self.create_index_weight_table(index,date)
 
-
-
-    def get_index_stocks(self,index):
+    def create_index_weight_table(self,index,date):
+        tablename  = '{}_index_weight_{}'.format(index,date).replace('.','')
         pass
-
-
-
 
 if __name__=="__main__":
     k = MyDataset()
     k.init()
-    k.show_index()
-    print("==delim==")
-    k.show_index('成长指数')
-    #p = k.get_stock_data_start_end('600435','2020-12-01','2021-01-01')
-    #print(p)
+    #k.show_index()
+    #print("==delim==")
+    #k.show_index('成长指数')
+    p = k.get_stock_data_start_end('600435','2020-11-01','2021-01-01')
+    print(p)
