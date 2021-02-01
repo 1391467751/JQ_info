@@ -2,6 +2,8 @@ from tool.mylog import MyLog
 from remote_data.Remote_Data_Imp import remote_dataset
 from local_data.Local_Data_Imp import LocalDataset
 
+import jqdatasdk as jqs
+
 import datetime
 
 import time
@@ -51,7 +53,7 @@ class MyDataset():
             end_date = datetime.date.today().strftime("%Y-%m-%d")
         self.log.log("Log : try to get code {} data from  {} to {}".format(code,start_date,end_date),self.name)
         data_table =  "{}_price".format(self.rd.get_normalize_code(code))
-        self.update_stock_data_start_end(code ,start_date,end_date,"{}_price".format(code),
+        self.update_stock_data_start_end(code ,start_date,end_date,self.__table_name_stock_price(code),
             self.stock_price_prop,
             self.__get_local_stock_price_data_start_end,
             self.__get_remote_stock_price_data_start_end
@@ -73,8 +75,12 @@ class MyDataset():
         if(end):
             where_limit.append('date<= date("{}")'.format(end))
         where =  ' and '.join(where_limit)
-        table =  "{}_price".format(code)
+        table =  self.__table_name_stock_price(self.rd.get_normalize_code(code))
         return self.ld.select_data(table,order_by = "Date",where_limit = None if len(where)<4 else where)
+
+    def __table_name_stock_price(self,code):
+        code = self.rd.get_normalize_code(code)
+        return "{}_price".format(code).replace('.','_')
 
     def update_stock_data_start_end(self,code,start_date,end_date,data_table,create_prop,func_local,func_remote):
         '''
@@ -88,7 +94,7 @@ class MyDataset():
 
         '''
         if(not self.ld.has_table(data_table)):
-            self.log.log("Warning : not find table {}, create it ".format(data_table))
+            self.log.log("Warning : not find table {}, create it ".format(data_table),self.name)
             self.__create_stock_data_table(data_table,create_prop)    
         start_time = time.strptime(start_date,"%Y-%m-%d")
         start = datetime.date(start_time.tm_year,start_time.tm_mon,start_time.tm_mday)
@@ -99,19 +105,29 @@ class MyDataset():
             record_date_last =  data[-1][0]
             self.log.log("Log :  local dataset find data from {} to {}".format(record_date_first,record_date_last),self.name)
             if(start<record_date_first):
-                data =  func_remote(code,start.strftime("%Y-%m-%d"),record_date_first.strftime("%Y-%m-%d"))
-                data=data.fillna(-1)
-                if(len(data.index)>0):
-                    data.insert(0,'date',data.index)
-                    data['date'] = data['date'].apply(lambda x: '{}'.format(x.strftime("%Y%m%d")))
-                    self.ld.insert_multi_data(data_table,data.to_numpy(), data.columns.to_list())
+                if(record_date_first-start == datetime.timedelta(1) and record_date_last.weekday()==1):
+                    pass
+                elif (record_date_first -start  == datetime.timedelta(2) and  record_date_last.weekday()==1):
+                    pass
+                else:
+                    data =  func_remote(code,start.strftime("%Y-%m-%d"),record_date_first.strftime("%Y-%m-%d"))
+                    data=data.fillna(-1)
+                    if(len(data.index)>0):
+                        data.insert(0,'date',data.index)
+                        data['date'] = data['date'].apply(lambda x: '{}'.format(x.strftime("%Y%m%d")))
+                        self.ld.insert_multi_data(data_table,data.to_numpy(), data.columns.to_list())
             if(end>record_date_last):
-                data =  func_remote(code,record_date_last.strftime("%Y-%m-%d"),end.strftime("%Y-%m-%d"))
-                data=data.fillna(-1)
-                if(len(data.index)>0):
-                    data.insert(0,'date',data.index)
-                    data['date'] = data['date'].apply(lambda x:'{}'.format( x.strftime("%Y%m%d")))
-                    self.ld.insert_multi_data(data_table,data.to_numpy(), data.columns.to_list())
+                if (end-record_date_last== datetime.timedelta(1) and end.weekday() == 5):
+                    pass
+                elif (end-record_date_last == datetime.timedelta(2) and end.weekday() == 5):
+                    pass
+                else:
+                    data =  func_remote(code,record_date_last.strftime("%Y-%m-%d"),end.strftime("%Y-%m-%d"))
+                    data=data.fillna(-1)
+                    if(len(data.index)>0):
+                        data.insert(0,'date',data.index)
+                        data['date'] = data['date'].apply(lambda x:'{}'.format( x.strftime("%Y%m%d")))
+                        self.ld.insert_multi_data(data_table,data.to_numpy(), data.columns.to_list())
         else:
             self.log.log("Log : no local data find for code {}".format(code),self.name)
             data =  func_remote(code,start.strftime("%Y-%m-%d"),end.strftime("%Y-%m-%d"))
@@ -152,8 +168,10 @@ class MyDataset():
 if __name__=="__main__":
     k = MyDataset()
     k.init()
+    lis = jqs.get_index_stocks('000300.XSHG')
     #k.show_index()
     #print("==delim==")
     #k.show_index('成长指数')
-    p = k.get_stock_data_start_end('600435','2020-11-01','2021-01-01')
+    #p = k.get_stock_data_start_end('600435','2020-11-01','2021-01-01')
+    p = k.get_multi_stock_data_start_end(lis,'2018-01-01','2021-01-31')
     print(p)
